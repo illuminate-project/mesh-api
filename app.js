@@ -48,15 +48,17 @@ app.post('/api/mesh', upload.fields([{ name: 'image', maxCount: 1 }, { name: 'de
     ctx.putImageData(imageData, 0, 0);
 
     // Use Three.js to create a mesh from the canvas
-    const geometry = new THREE.PlaneGeometry(image.bitmap.width, image.bitmap.height, image.bitmap.width - 1, image.bitmap.height - 1);
-    if (!geometry.attributes.position) {
-      throw new Error('Failed to create geometry attributes');
-    }
-    const material = new THREE.MeshStandardMaterial({ side: THREE.DoubleSide });
-    const mesh = new THREE.Mesh(geometry, material);
-    if (!mesh.geometry) {
-      throw new Error('Failed to create mesh geometry');
-    }
+    const scene = new THREE.Scene();
+
+    // const geometry = new THREE.PlaneGeometry(image.bitmap.width, image.bitmap.height, image.bitmap.width - 1, image.bitmap.height - 1);
+    // if (!geometry.attributes.position) {
+    //   throw new Error('Failed to create geometry attributes');
+    // }
+    // const material = new THREE.MeshStandardMaterial({ side: THREE.DoubleSide });
+    // const mesh = new THREE.Mesh(geometry, material);
+    // if (!mesh.geometry) {
+    //   throw new Error('Failed to create mesh geometry');
+    // }
 
     console.log('mesh.geometry:', mesh.geometry);
     console.log('mesh.geometry.attributes.position:', mesh.geometry.attributes.position);
