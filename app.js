@@ -2,10 +2,9 @@ const express = require('express');
 const multer = require('multer');
 const Jimp = require('jimp');
 const { createCanvas } = require('canvas');
-const { Mesh } = require('three');
 const sharp = require('sharp');
 const THREE = require('three');
-var OBJExporter = require('three-obj-exporter');
+const { OBJExporter } = require('three-obj-exporter');
 
 const app = express();
 
@@ -49,25 +48,36 @@ app.post('/api/mesh', upload.fields([{ name: 'image', maxCount: 1 }, { name: 'de
     ctx.putImageData(imageData, 0, 0);
 
     // Use Three.js to create a mesh from the canvas
-    const mesh = new Mesh(
-      new THREE.PlaneGeometry(image.bitmap.width, image.bitmap.height, image.bitmap.width - 1, image.bitmap.height - 1),
-      new THREE.MeshStandardMaterial({ side: THREE.DoubleSide })
-    );
-    
+    const geometry = new THREE.PlaneGeometry(image.bitmap.width, image.bitmap.height, image.bitmap.width - 1, image.bitmap.height - 1);
+    if (!geometry.attributes.position) {
+      throw new Error('Failed to create geometry attributes');
+    }
+    const material = new THREE.MeshStandardMaterial({ side: THREE.DoubleSide });
+    const mesh = new THREE.Mesh(geometry, material);
+    if (!mesh.geometry) {
+      throw new Error('Failed to create mesh geometry');
+    }
+
     console.log('mesh.geometry:', mesh.geometry);
     console.log('mesh.geometry.attributes.position:', mesh.geometry.attributes.position);
 
-    for (let i = 0; i < mesh.geometry.attributes.position.length; i++) {
-      const { x, y } = mesh.geometry.attributes.position[i];
+    for (let i = 0; i < mesh.geometry.attributes.position.count; i++) {
+      const { x, y } = mesh.geometry.attributes.position.getItem(i);
       const { data } = ctx.getImageData(x, y, 1, 1);
-
+    
       // Set the height of the vertex based on the grayscale value of the corresponding pixel in the depth map
-      mesh.geometry.attributes.position[i].z = (data[0] + data[1] + data[2]) / 3 / 255;
+      mesh.geometry.attributes.position.setZ(i, (data[0] + data[1] + data[2]) / 3 / 255);
     }
 
     // Export the mesh as an OBJ file
     const exporter = new OBJExporter();
+    if (!(exporter instanceof OBJExporter)) {
+      throw new Error('Failed to create OBJExporter instance');
+    }
     const obj = exporter.parse(mesh);
+    if (!obj) {
+      throw new Error('Failed to parse mesh as OBJ file');
+    }
 
     res.setHeader('Content-Type', 'text/plain');
     res.setHeader('Content-Disposition', 'attachment; filename=model.obj');
