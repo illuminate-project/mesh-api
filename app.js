@@ -48,7 +48,92 @@ app.post('/api/mesh', upload.fields([{ name: 'image', maxCount: 1 }, { name: 'de
     ctx.putImageData(imageData, 0, 0);
 
     // Use Three.js to create a mesh from the canvas
-    const scene = new THREE.Scene();
+
+    
+
+    // plane geometry (missing image data)
+    var geometry = new THREE.BufferGeometry();
+    var size = w * h;
+
+    geometry.addAttribute( 'position', Float32Array, size, 3 );
+    geometry.addAttribute( 'customColor', Float32Array, size, 3 );
+  
+    var positions = geometry.attributes.position.array;
+    var customColors = geometry.attributes.customColor.array;
+
+    adjustment = 10 * 960 / img.width // not really sure how to get image width and shit
+    var ar = img.height / img.width;
+    var scale = new THREE.Vector3( 1, 1, 1 );
+    var v = new THREE.Vector3();
+    var ptr = 0;
+    var minZ = 100000000000, maxZ = -100000000000;
+
+    // computes points for the mesh
+    for( var y = 0; y < h; y++ ) {
+      for( var x = 0; x < w; x++ ) {
+        v.x = ( x - .5 * w ) / w;
+        v.y = ( y - .5 * h ) / h;
+        p = Math.round( ( ( -v.y + .5 ) ) * ( img.height - 1 ) ) * img.width * 4 + Math.round( ( ( v.x + .5 ) ) * ( img.width - 1 ) ) * 4;
+        var dn = imageData.data[ p ] / 255;
+        var rd = ( far * near ) / ( far - dn * ( far - near ) ); // RangeInverse
+        //var rd = ( 1 - dn ) * ( far - near ) + near; // RangeLinear
+        v.z = -rd ;
+        v.x *= rd * 1;
+        v.y *= rd * ar;
+        v.multiply( scale );
+
+        positions[ ptr + 0 ] = v.x;
+        positions[ ptr + 1 ] = v.y;
+        positions[ ptr + 2 ] = v.z;
+
+        customColors[ ptr + 0 ] = colorImageData.data[ p + 0 ] / 255; //missing color data
+        customColors[ ptr + 1 ] = colorImageData.data[ p + 1 ] / 255;
+        customColors[ ptr + 2 ] = colorImageData.data[ p + 2 ] / 255;
+        
+        ptr += 3;
+
+        if( v.z < minZ ) minZ = v.z;
+        if( v.z > maxZ ) maxZ = v.z;
+
+      }
+    }
+
+    var offset = ( maxZ - minZ ) / 2;
+    for( var j = 0; j < positions.length; j+=3 ) {
+      positions[ j + 2 ] += offset;
+    }
+
+    var step = settings.quadSize;
+    
+    // creates mesh
+    var planeGeometry = new THREE.PlaneGeometry( 1, 1, Math.round( w / step ), Math.round( h / step ) );
+    ptr = 0;
+    for( var j = 0; j < planeGeometry.vertices.length; j++ ) {
+      v = planeGeometry.vertices[ j ];
+      p = Math.round( ( ( -v.y + .5 ) ) * ( img.height - 1 ) ) * img.width * 4 + Math.round( ( ( v.x + .5 ) ) * ( img.width - 1 ) ) * 4;
+      var dn = imageData.data[ p ] / 255;
+      //console.log( v, p, dn );
+      var rd = ( far * near ) / ( far - dn * ( far - near ) ); // RangeInverse
+      //var rd = ( 1 - dn ) * ( far - near ) + near; // RangeLinear
+      v.z = -rd ;
+      v.x *= rd * 1;
+      v.y *= rd * ar;
+      v.multiply( scale );
+      v.z += offset;
+    }
+
+    planeGeometry.computeFaceNormals();
+    planeGeometry.computeVertexNormals();
+
+    // texture
+    var tex = new THREE.Texture( imgSrc );
+		tex.needsUpdate = true;
+
+    // create mesh with texture and plane geometry
+    var meshSolid = new THREE.Mesh( planeGeometry, new THREE.MeshBasicMaterial( { map: tex, wireframe: false, side: THREE.DoubleSide }) );
+
+
+    //const scene = new THREE.Scene();
 
     // const geometry = new THREE.PlaneGeometry(image.bitmap.width, image.bitmap.height, image.bitmap.width - 1, image.bitmap.height - 1);
     // if (!geometry.attributes.position) {
