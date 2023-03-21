@@ -25,30 +25,31 @@ app.post('/api/mesh', upload.fields([{ name: 'image', maxCount: 1 }, { name: 'de
     const { width, height } = image.bitmap;
 
     // Decode the depth map from grayscale to RGB format
-    const depthImage = await sharp(depthBuffer)
-      .resize(width, height)
-      .toFormat('png')
-      .raw()
-      .toBuffer({ resolveWithObject: true });
+    // const depthImage = await sharp(depthBuffer)
+    //   .resize(width, height)
+    //   .toFormat('png')
+    //   .raw()
+    //   .toBuffer({ resolveWithObject: true });
 
     const canvas = createCanvas(width, height);
     const ctx = canvas.getContext('2d');
     const imageData = ctx.createImageData(width, height);
 
     // Set the RGB values of the image data from the depth map
-    for (let i = 0; i < depthImage.data.length; i += 3) {
-      const depth = depthImage.data[i];
-      imageData.data[i] = depth;
-      imageData.data[i + 1] = depth;
-      imageData.data[i + 2] = depth;
-      imageData.data[i + 3] = 255;
-    }
+    // for (let i = 0; i < depthImage.data.length; i += 3) {
+    //   const depth = depthImage.data[i];
+    //   imageData.data[i] = depth;
+    //   imageData.data[i + 1] = depth;
+    //   imageData.data[i + 2] = depth;
+    //   imageData.data[i + 3] = 255;
+    // }
 
     // Draw the image data onto the canvas
     ctx.putImageData(imageData, 0, 0);
 
     // Use Three.js to create a mesh from the canvas
 
+    // get image data
     
 
     // plane geometry (missing image data)
@@ -130,7 +131,7 @@ app.post('/api/mesh', upload.fields([{ name: 'image', maxCount: 1 }, { name: 'de
 		tex.needsUpdate = true;
 
     // create mesh with texture and plane geometry
-    var meshSolid = new THREE.Mesh( planeGeometry, new THREE.MeshBasicMaterial( { map: tex, wireframe: false, side: THREE.DoubleSide }) );
+    var mesh = new THREE.Mesh( planeGeometry, new THREE.MeshBasicMaterial( { map: tex, wireframe: false, side: THREE.DoubleSide }) );
 
 
     //const scene = new THREE.Scene();
