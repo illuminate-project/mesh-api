@@ -120,16 +120,16 @@ app.post('/api/mesh', upload.fields([{ name: 'image', maxCount: 1 }, { name: 'de
         var geometry = new THREE.BufferGeometry();
         var size = w * h;
 
-        // geometry.setAttribute( 'position', Float32Array, size, 3 );
-        // geometry.setAttribute( 'customColor', Float32Array, size, 3 );
+        geometry.addAttribute( 'position', Float32Array, size, 3 );
+        geometry.addAttribute( 'customColor', Float32Array, size, 3 );
 
-        geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(size * 3), 3));
-        geometry.setAttribute('customColor', new THREE.BufferAttribute(new Float32Array(size * 3), 3));
+        // geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(size * 3), 3));
+        // geometry.setAttribute('customColor', new THREE.BufferAttribute(new Float32Array(size * 3), 3));
     
         var positions = geometry.attributes.position.array;
         var customColors = geometry.attributes.customColor.array;
 
-        console.log(geometry.attributes.position)
+        //console.log(geometry.attributes.position)
 
         adjustment = 10 * 960 / depthImage.width() 
         var ar = depthImage.height() / depthImage.width();
@@ -181,7 +181,7 @@ app.post('/api/mesh', upload.fields([{ name: 'image', maxCount: 1 }, { name: 'de
         // creates mesh
         var planeGeometry = new THREE.PlaneGeometry( 1, 1, Math.round( w ), Math.round( h ) );
         ptr = 0;
-        console.log(planeGeometry)
+        //console.log(planeGeometry)
         for( var j = 0; j < planeGeometry.vertices.length; j++ ) {
             v = planeGeometry.vertices[ j ];
             p = Math.round( ( ( -v.y + .5 ) ) * ( depthImage.height() - 1 ) ) * depthImage.width() * 4 + Math.round( ( ( v.x + .5 ) ) * ( depthImage.width() - 1 ) ) * 4;
