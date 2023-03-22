@@ -1,7 +1,8 @@
 const express = require('express');
 const multer = require('multer');
 const Jimp = require('jimp');
-const { createCanvas } = require('canvas');
+//const canvas = require('canvas');
+const { createCanvas, ImageData } = require('canvas');
 const sharp = require('sharp');
 const THREE = require('three');
 const { OBJExporter } = require('three-obj-exporter');
@@ -58,6 +59,9 @@ app.post('/api/mesh', upload.fields([{ name: 'image', maxCount: 1 }, { name: 'de
 
         // Use Three.js to create a mesh from the canvas
 
+        var far = 20;
+        var near = 5;
+
         // get image data
 
         // following code only works with Image() which is browser only
@@ -67,17 +71,27 @@ app.post('/api/mesh', upload.fields([{ name: 'image', maxCount: 1 }, { name: 'de
         // colorImage.src = imageURL;
 
         // testing
-        // var depthImage = images("depth.jpeg");
-        // var colorImage = images("image.jpeg");
+        var depthImage = images("depth.jpeg");
+        var colorImage = images("image.jpeg");
 
-        // console.log("retard");
-        // console.log(depthImage.width());
+        console.log("retard");
+        console.log(depthImage.width());
 
-        // testing pt 2 (makes uint8array) successfully
+        // creates uint8array of image data which is later used to make imageData object
         var depthBuf = fs.readFileSync('depth.jpeg');
+        var decodedData1;
         console.log("reached here")
         inkjet.decode(depthBuf, function(err, decoded){
             console.log(decoded.data)
+            decodedData1 = new Uint8ClampedArray(decoded.data);
+        });
+        
+        var imageBuf = fs.readFileSync('image.jpeg');
+        var decodedData2;
+        console.log("reached here 2")
+        inkjet.decode(imageBuf, function(err, decoded2){
+            console.log(decoded2.data)
+            decodedData2 = new Uint8ClampedArray(decoded2.data);
         });
 
 
@@ -87,26 +101,35 @@ app.post('/api/mesh', upload.fields([{ name: 'image', maxCount: 1 }, { name: 'de
         // depth canvas
         var canvas = createCanvas( depthImage.width(), depthImage.height() );
         var ctx = canvas.getContext( '2d' );
-        ctx.drawImage(depthImage, 0, 0);
-        var imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        //ctx.drawImage(depthImage, 0, 0);
+        //var imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        var imageData = new ImageData(decodedData1, depthImage.width(), depthImage.height());
+        console.log("please work");
+        console.log(imageData.data);
         var p = 0;
 
         // color canvas
         var colorCanvas = createCanvas( colorImage.width(), colorImage.height() );
         var colorCtx = colorCanvas.getContext( '2d' );
-        colorCtx.drawImage(colorImage, 0, 0);
-        var colorImageData = colorCtx.getImageData(0, 0, colorCanvas.width, colorCanvas.height);
+        //colorCtx.drawImage(colorImage, 0, 0);
+        //var colorImageData = colorCtx.getImageData(0, 0, colorCanvas.width, colorCanvas.height);
+        var colorImageData = new ImageData(decodedData2, colorImage.width(), colorImage.height());
         var colorP = 0;
 
         // plane geometry (missing image data)
         var geometry = new THREE.BufferGeometry();
         var size = w * h;
 
-        geometry.addAttribute( 'position', Float32Array, size, 3 );
-        geometry.addAttribute( 'customColor', Float32Array, size, 3 );
+        // geometry.setAttribute( 'position', Float32Array, size, 3 );
+        // geometry.setAttribute( 'customColor', Float32Array, size, 3 );
+
+        geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(size * 3), 3));
+        geometry.setAttribute('customColor', new THREE.BufferAttribute(new Float32Array(size * 3), 3));
     
         var positions = geometry.attributes.position.array;
         var customColors = geometry.attributes.customColor.array;
+
+        console.log(geometry.attributes.position)
 
         adjustment = 10 * 960 / depthImage.width() 
         var ar = depthImage.height() / depthImage.width();
@@ -132,13 +155,13 @@ app.post('/api/mesh', upload.fields([{ name: 'image', maxCount: 1 }, { name: 'de
                 v.y *= rd * ar;
                 v.multiply( scale );
 
-                positions[ ptr + 0 ] = v.x;
-                positions[ ptr + 1 ] = v.y;
-                positions[ ptr + 2 ] = v.z;
+                // positions[ ptr + 0 ] = v.x;
+                // positions[ ptr + 1 ] = v.y;
+                // positions[ ptr + 2 ] = v.z;
 
-                customColors[ ptr + 0 ] = colorImageData.data[ p + 0 ] / 255;
-                customColors[ ptr + 1 ] = colorImageData.data[ p + 1 ] / 255;
-                customColors[ ptr + 2 ] = colorImageData.data[ p + 2 ] / 255;
+                // customColors[ ptr + 0 ] = colorImageData.data[ p + 0 ] / 255;
+                // customColors[ ptr + 1 ] = colorImageData.data[ p + 1 ] / 255;
+                // customColors[ ptr + 2 ] = colorImageData.data[ p + 2 ] / 255;
                 
                 ptr += 3;
 
@@ -149,15 +172,16 @@ app.post('/api/mesh', upload.fields([{ name: 'image', maxCount: 1 }, { name: 'de
         }
 
         var offset = ( maxZ - minZ ) / 2;
-        for( var j = 0; j < positions.length; j+=3 ) {
-            positions[ j + 2 ] += offset;
-        }
+        // for( var j = 0; j < positions.length; j+=3 ) {
+        //     positions[ j + 2 ] += offset;
+        // }
 
         //var step = settings.quadSize;
         
         // creates mesh
         var planeGeometry = new THREE.PlaneGeometry( 1, 1, Math.round( w ), Math.round( h ) );
         ptr = 0;
+        console.log(planeGeometry)
         for( var j = 0; j < planeGeometry.vertices.length; j++ ) {
             v = planeGeometry.vertices[ j ];
             p = Math.round( ( ( -v.y + .5 ) ) * ( depthImage.height() - 1 ) ) * depthImage.width() * 4 + Math.round( ( ( v.x + .5 ) ) * ( depthImage.width() - 1 ) ) * 4;
@@ -211,7 +235,7 @@ app.post('/api/mesh', upload.fields([{ name: 'image', maxCount: 1 }, { name: 'de
         if (!(exporter instanceof OBJExporter)) {
             throw new Error('Failed to create OBJExporter instance');
         }
-        const obj = exporter.parse(mesh);
+        const obj = exporter.parse(mesh.geometry, false);
         if (!obj) {
             throw new Error('Failed to parse mesh as OBJ file');
         }
