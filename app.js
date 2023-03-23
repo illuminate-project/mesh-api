@@ -5,7 +5,7 @@ const Jimp = require('jimp');
 const { createCanvas, ImageData } = require('canvas');
 const sharp = require('sharp');
 const THREE = require('three');
-const { OBJExporter } = require('three-obj-exporter');
+const OBJExporter = require('three-obj-exporter');
 const fs = require('fs');
 
 const images = require('images');
@@ -235,7 +235,7 @@ app.post('/api/mesh', upload.fields([{ name: 'image', maxCount: 1 }, { name: 'de
         if (!(exporter instanceof OBJExporter)) {
             throw new Error('Failed to create OBJExporter instance');
         }
-        const obj = exporter.parse(mesh.geometry, false);
+        const obj = exporter.parse(mesh);
         if (!obj) {
             throw new Error('Failed to parse mesh as OBJ file');
         }
