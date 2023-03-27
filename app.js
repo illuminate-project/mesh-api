@@ -1,19 +1,15 @@
-const express = require('express');
-const multer = require('multer');
-const Jimp = require('jimp');
-//const canvas = require('canvas');
-const { createCanvas, ImageData } = require('canvas');
-const sharp = require('sharp');
-const THREE = require('three');
-const OBJExporter = require('three-obj-exporter');
-const fs = require('fs');
+import express from 'express';
+import multer from 'multer';
+import Jimp from 'jimp';
+import { createCanvas, ImageData } from 'canvas';
+import sharp from 'sharp';
+import * as THREE from 'three';
+import { OBJExporter } from 'three/addons/exporters/OBJExporter.js';
+import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
+import fs from 'fs';
 
-const images = require('images');
-const inkjet = require('inkjet');
-
-//const vars = require('./vars');
-const { imageURL, depthURL } = require('./vars');
-
+import images from 'images';
+import inkjet from 'inkjet';
 
 const app = express();
 
@@ -29,56 +25,19 @@ app.use(express.urlencoded({ extended: false }));
 
 app.post('/api/mesh', upload.fields([{ name: 'image', maxCount: 1 }, { name: 'depth', maxCount: 1 }]), async (req, res) => {
     try {
-        const image = await Jimp.read(req.files['image'][0].buffer);
-        const depthBuffer = req.files['depth'][0].buffer;
-        const { width, height } = image.bitmap;
-
-        // Decode the depth map from grayscale to RGB format
-        // const depthImage = await sharp(depthBuffer)
-        //     .resize(width, height)
-        //     .toFormat('png')
-        //     .raw()
-        //     .toBuffer({ resolveWithObject: true });
-
-        // sakun
-        // const canvas = createCanvas(width, height);
-        // const ctx = canvas.getContext('2d');
-        // const imageData = ctx.createImageData(width, height);
-
-        // Set the RGB values of the image data from the depth map
-        // for (let i = 0; i < depthImage.data.length; i += 3) {
-        //     const depth = depthImage.data[i];
-        //     imageData.data[i] = depth;
-        //     imageData.data[i + 1] = depth;
-        //     imageData.data[i + 2] = depth;
-        //     imageData.data[i + 3] = 255;
-        // }
-
-        // Draw the image data onto the canvas
-        //ctx.putImageData(imageData, 0, 0);
-
-        // Use Three.js to create a mesh from the canvas
+        const colorImage = await Jimp.read(req.files['image'][0].buffer);
+        const depthImage = await Jimp.read(req.files['depth'][0].buffer);
+        //const { width, height } = image.bitmap;
 
         var far = 20;
         var near = 5;
 
-        // get image data
-
-        // following code only works with Image() which is browser only
-        // var depthImage = new Image();
-        // depthImage.src = depthURL;
-        // var colorImage = new Image();
-        // colorImage.src = imageURL;
-
         // testing
-        var depthImage = images("depth.jpeg");
-        var colorImage = images("image.jpeg");
-
-        console.log("retard");
-        console.log(depthImage.width());
+        /*var depthImage = images("depth_50.jpg");
+        var colorImage = images("image_50.jpg");*/
 
         // creates uint8array of image data which is later used to make imageData object
-        var depthBuf = fs.readFileSync('depth.jpeg');
+        var depthBuf = req.files.image[0].buffer;
         var decodedData1;
         console.log("reached here")
         inkjet.decode(depthBuf, function(err, decoded){
@@ -86,7 +45,7 @@ app.post('/api/mesh', upload.fields([{ name: 'image', maxCount: 1 }, { name: 'de
             decodedData1 = new Uint8ClampedArray(decoded.data);
         });
         
-        var imageBuf = fs.readFileSync('image.jpeg');
+        var imageBuf = req.files.depth[0].buffer;
         var decodedData2;
         console.log("reached here 2")
         inkjet.decode(imageBuf, function(err, decoded2){
@@ -94,9 +53,10 @@ app.post('/api/mesh', upload.fields([{ name: 'image', maxCount: 1 }, { name: 'de
             decodedData2 = new Uint8ClampedArray(decoded2.data);
         });
 
-
-        var w = Math.round( depthImage.width());
-        var h = Math.round( depthImage.height());
+        // change this manually to change scale
+        var downsample = 4;
+        var w = Math.round( depthImage.width() / downsample );
+        var h = Math.round( depthImage.height() / downsample );
 
         // depth canvas
         var canvas = createCanvas( depthImage.width(), depthImage.height() );
@@ -118,20 +78,30 @@ app.post('/api/mesh', upload.fields([{ name: 'image', maxCount: 1 }, { name: 'de
 
         // plane geometry (missing image data)
         var geometry = new THREE.BufferGeometry();
+        console.log("GEOMETRY IS ")
+        console.log(geometry)
         var size = w * h;
 
-        geometry.addAttribute( 'position', Float32Array, size, 3 );
-        geometry.addAttribute( 'customColor', Float32Array, size, 3 );
+        console.log("w and h are " + w + " " + h + "")
+        console.log("SIZE IS " + size + "")
 
-        // geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(size * 3), 3));
-        // geometry.setAttribute('customColor', new THREE.BufferAttribute(new Float32Array(size * 3), 3));
+        // geometry.addAttribute( 'position', Float32Array, size, 3 ); // item size is 3
+        // geometry.addAttribute( 'customColor', Float32Array, size, 3 );
+
+        geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(size * 3), 3));
+        geometry.setAttribute('customColor', new THREE.BufferAttribute(new Float32Array(size * 3), 3));
+
+        console.log("buffer geometry")
+        console.log(geometry)
+        console.log(geometry.attributes.position.array)
+        console.log(geometry.attributes.position.array.length)
+        console.log("size")
+        console.log(size)
     
         var positions = geometry.attributes.position.array;
         var customColors = geometry.attributes.customColor.array;
 
-        //console.log(geometry.attributes.position)
-
-        adjustment = 10 * 960 / depthImage.width() 
+        var adjustment = 10 * 960 / depthImage.width() 
         var ar = depthImage.height() / depthImage.width();
         var scale = new THREE.Vector3( 1, 1, 1 );
         var v = new THREE.Vector3();
@@ -155,13 +125,13 @@ app.post('/api/mesh', upload.fields([{ name: 'image', maxCount: 1 }, { name: 'de
                 v.y *= rd * ar;
                 v.multiply( scale );
 
-                // positions[ ptr + 0 ] = v.x;
-                // positions[ ptr + 1 ] = v.y;
-                // positions[ ptr + 2 ] = v.z;
+                positions[ ptr + 0 ] = v.x;
+                positions[ ptr + 1 ] = v.y;
+                positions[ ptr + 2 ] = v.z;
 
-                // customColors[ ptr + 0 ] = colorImageData.data[ p + 0 ] / 255;
-                // customColors[ ptr + 1 ] = colorImageData.data[ p + 1 ] / 255;
-                // customColors[ ptr + 2 ] = colorImageData.data[ p + 2 ] / 255;
+                customColors[ ptr + 0 ] = colorImageData.data[ p + 0 ] / 255;
+                customColors[ ptr + 1 ] = colorImageData.data[ p + 1 ] / 255;
+                customColors[ ptr + 2 ] = colorImageData.data[ p + 2 ] / 255;
                 
                 ptr += 3;
 
@@ -178,57 +148,71 @@ app.post('/api/mesh', upload.fields([{ name: 'image', maxCount: 1 }, { name: 'de
 
         //var step = settings.quadSize;
         
-        // creates mesh
-        var planeGeometry = new THREE.PlaneGeometry( 1, 1, Math.round( w ), Math.round( h ) );
+        // CREATING PLANE GEOMETRY FOR MESH
+
+        var planeGeometryOld = new THREE.PlaneGeometry( 1, 1, Math.round( w ), Math.round( h ) );
+        console.log("PLANE GEOMETRY OLD")
+        console.log(planeGeometryOld)
+        console.log(planeGeometryOld.attributes.position.array) // THIS IS VERTICES
+        // var planeGeometry2 = new THREE.BufferGeometry(1, 1, Math.round(w), Math.round(h))
+        // console.log("PLANE GEOMETRY 2")
+        // console.log(planeGeometry2)
+
+        var planeGeometry = new THREE.BufferGeometry();
+        //var vertices = new Float32Array(size * 3); // x, y, z per point, num points = size
+        var vertices = new Array(size);
+        // add attribute array of size w * h, each index is a vector p
+
         ptr = 0;
-        //console.log(planeGeometry)
-        for( var j = 0; j < planeGeometry.vertices.length; j++ ) {
-            v = planeGeometry.vertices[ j ];
-            p = Math.round( ( ( -v.y + .5 ) ) * ( depthImage.height() - 1 ) ) * depthImage.width() * 4 + Math.round( ( ( v.x + .5 ) ) * ( depthImage.width() - 1 ) ) * 4;
+        var vx, vy, vz;
+
+        var vertex = new THREE.Vector3();
+
+        // this loops works !!!
+        for( var j = 0; j < planeGeometryOld.attributes.position.array.length; j += 3 ){
+            vx = planeGeometryOld.attributes.position.array[ j ];
+            vy = planeGeometryOld.attributes.position.array[ j + 1 ];
+            vz = planeGeometryOld.attributes.position.array[ j + 2 ];
+
+            // returb
+            p = Math.round( ( ( -vy + .5 ) ) * ( depthImage.height() - 1 ) ) * depthImage.width() * 4 + Math.round( ( ( vx + .5 ) ) * ( depthImage.width() - 1 ) ) * 4;
+
             var dn = imageData.data[ p ] / 255;
-            //console.log( v, p, dn );
-            var rd = ( far * near ) / ( far - dn * ( far - near ) ); // RangeInverse
-            //var rd = ( 1 - dn ) * ( far - near ) + near; // RangeLinear
-            v.z = -rd ;
-            v.x *= rd * 1;
-            v.y *= rd * ar;
-            v.multiply( scale );
-            v.z += offset;
+            var rd = ( 1 - dn ) * ( far - near ) + near; // RangeLinear
+
+            vz = -rd;
+            vx *= rd * 1;
+            vy *= rd * ar;
+            vz += offset;
+
+            planeGeometryOld.attributes.position.array[ j ] = vx;
+            planeGeometryOld.attributes.position.array[ j + 1 ] = vy;
+            planeGeometryOld.attributes.position.array[ j + 2 ] = vz;
+            vertices[j] = vx;
+            vertices[j+1] = vy;
+            vertices[j+2] = vz;
         }
 
-        planeGeometry.computeFaceNormals();
-        planeGeometry.computeVertexNormals();
 
-        // texture returb
-        var tex = new THREE.Texture( colorImage);
+        console.log("THIS IS THE OLD PLANE GEOMETRY after loop")
+        console.log(planeGeometryOld)
+        console.log(planeGeometryOld.attributes.position.array)
+
+        // planeGeometry.computeFaceNormals();
+        planeGeometryOld.computeVertexNormals();
+
+        // texture (dont really need this for object)
+        var tex = new THREE.Texture( colorImage );
 		tex.needsUpdate = true;
 
         // create mesh with texture and plane geometry
-        var mesh = new THREE.Mesh( planeGeometry, new THREE.MeshBasicMaterial( { map: tex, wireframe: false, side: THREE.DoubleSide }) );
+        var mesh = new THREE.Mesh( planeGeometryOld, new THREE.MeshBasicMaterial( { map: tex, wireframe: false, side: THREE.DoubleSide }) );
+        console.log("COMPARING MESH TO DP")
+        console.log(mesh)
+        const loader = new OBJLoader();
+        //loader.load('dp.obj', function(object) {console.log("PRINTING DP"); console.log(object);});
         mesh.scale.set( adjustment, adjustment, adjustment );
 
-        //const scene = new THREE.Scene();
-
-        // const geometry = new THREE.PlaneGeometry(image.bitmap.width, image.bitmap.height, image.bitmap.width - 1, image.bitmap.height - 1);
-        // if (!geometry.attributes.position) {
-        //     throw new Error('Failed to create geometry attributes');
-        // }
-        // const material = new THREE.MeshStandardMaterial({ side: THREE.DoubleSide });
-        // const mesh = new THREE.Mesh(geometry, material);
-        // if (!mesh.geometry) {
-        //     throw new Error('Failed to create mesh geometry');
-        // }
-
-        // console.log('mesh.geometry:', mesh.geometry);
-        // console.log('mesh.geometry.attributes.position:', mesh.geometry.attributes.position);
-
-        // for (let i = 0; i < mesh.geometry.attributes.position.count; i++) {
-        //     const { x, y } = mesh.geometry.attributes.position.getItem(i);
-        //     const { data } = ctx.getImageData(x, y, 1, 1);
-        
-        //     // Set the height of the vertex based on the grayscale value of the corresponding pixel in the depth map
-        //     mesh.geometry.attributes.position.setZ(i, (data[0] + data[1] + data[2]) / 3 / 255);
-        // }
 
         // Export the mesh as an OBJ file
         const exporter = new OBJExporter();
