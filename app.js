@@ -54,7 +54,7 @@ app.post('/api/mesh', upload.fields([{ name: 'image', maxCount: 1 }, { name: 'de
         });
 
         // change this manually to change scale
-        var downsample = 4;
+        var downsample = 6;
         var w = Math.round( depthImage.width() / downsample );
         var h = Math.round( depthImage.height() / downsample );
 
