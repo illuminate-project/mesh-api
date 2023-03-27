@@ -3,9 +3,7 @@ import multer from 'multer';
 import { createCanvas, ImageData } from 'canvas';
 import * as THREE from 'three';
 import { OBJExporter } from 'three/addons/exporters/OBJExporter.js';
-import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
-import sharp from 'sharp';
-import inkjet from 'inkjet';
+import decode from 'image-decode';
 
 const app = express();
 
@@ -22,74 +20,36 @@ app.use(express.urlencoded({ extended: false }));
 
 app.post('/api/mesh', upload.fields([{ name: 'image', maxCount: 1 }, { name: 'depth', maxCount: 1 }]), async (req, res) => {
     try {
-        
-        async function bufferToImage(buffer, inputFormat) {
-            try {
-            // read the buffer and convert it into an image
-            const image = await sharp(buffer, { inputFormat }).toBuffer();
-        
-            // get the image metadata, including width and height
-            const metadata = await sharp(image).metadata();
-        
-            return {
-                buffer: image,
-                width: metadata.width,
-                height: metadata.height,
-            };
-            } catch (error) {
-            console.error(error);
-            }
-        }
-        
-        const colorImage = await bufferToImage(req.files.image[0].buffer, 'jpg');
-        const depthImage = await bufferToImage(req.files.depth[0].buffer, 'jpg');
-        //const { width, height } = image.bitmap;
 
         var far = 20;
         var near = 5;
 
-        // testing
-        /*var depthImage = images("depth_50.jpg");
-        var colorImage = images("image_50.jpg");*/
-
-        // creates uint8array of image data which is later used to make imageData object
-        var depthBuf = req.files.depth[0].buffer;
-        var decodedData1;
-        console.log("reached here")
-        inkjet.decode(depthBuf, function(err, decoded){
-            console.log(decoded.data)
-            decodedData1 = new Uint8ClampedArray(decoded.data);
-        });
-        
-        var imageBuf = req.files.image[0].buffer;
-        var decodedData2;
-        console.log("reached here 2")
-        inkjet.decode(imageBuf, function(err, decoded2){
-            console.log(decoded2.data)
-            decodedData2 = new Uint8ClampedArray(decoded2.data);
-        });
+        var width = decode(req.files.depth[0].buffer).width;
+        var height = decode(req.files.depth[0].buffer).height;
+        var decodedData1 = new Uint8ClampedArray(decode(req.files.depth[0].buffer).data);
+        var decodedData2 = new Uint8ClampedArray(decode(req.files.image[0].buffer).data);
 
         // change this manually to change scale
         var downsample = 6;
-        var w = Math.round( depthImage.width / downsample );
-        var h = Math.round( depthImage.height / downsample );
+        var w = Math.round( width / downsample );
+        var h = Math.round( height / downsample );
 
         // depth canvas
-        var canvas = createCanvas( depthImage.width, depthImage.height );
+        var canvas = createCanvas( width, height );
         var ctx = canvas.getContext( '2d' );
         //ctx.drawImage(depthImage, 0, 0);
         //var imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        var imageData = new ImageData(decodedData1, depthImage.width, depthImage.height);
+        var imageData = new ImageData(decodedData1, width, height);
         console.log("please work");
         console.log(imageData.data);
         var p = 0;
 
         // color canvas
-        var colorCanvas = createCanvas( colorImage.width, colorImage.height );
+        var colorCanvas = createCanvas( width, height );
         var colorCtx = colorCanvas.getContext( '2d' );
         //colorCtx.drawImage(colorImage, 0, 0);
         //var colorImageData = colorCtx.getImageData(0, 0, colorCanvas.width, colorCanvas.height);
-        var colorImageData = new ImageData(decodedData2, colorImage.width, colorImage.height);
+        var colorImageData = new ImageData(decodedData2, width, height);
         var colorP = 0;
 
         // plane geometry (missing image data)
@@ -117,8 +77,8 @@ app.post('/api/mesh', upload.fields([{ name: 'image', maxCount: 1 }, { name: 'de
         var positions = geometry.attributes.position.array;
         var customColors = geometry.attributes.customColor.array;
 
-        var adjustment = 10 * 960 / depthImage.width; 
-        var ar = depthImage.height / depthImage.width;
+        var adjustment = 10 * 960 / width; 
+        var ar = height / width;
         var scale = new THREE.Vector3( 1, 1, 1 );
         var v = new THREE.Vector3();
         var ptr = 0;
@@ -129,7 +89,7 @@ app.post('/api/mesh', upload.fields([{ name: 'image', maxCount: 1 }, { name: 'de
             for( var x = 0; x < w; x++ ) {
                 v.x = ( x - .5 * w ) / w;
                 v.y = ( y - .5 * h ) / h;
-                p = Math.round( ( ( -v.y + .5 ) ) * ( depthImage.height - 1 ) ) * depthImage.width * 4 + Math.round( ( ( v.x + .5 ) ) * ( depthImage.width - 1 ) ) * 4;
+                p = Math.round( ( ( -v.y + .5 ) ) * ( height - 1 ) ) * width * 4 + Math.round( ( ( v.x + .5 ) ) * ( width - 1 ) ) * 4;
                 //console.log("y = ",y,"x = ",x,
                 //                        "imageData = ",imageData.data[ p ],
                 //                        "colorImageData = ",colorImageData.data[ p + 0 ],colorImageData.data[ p + 1 ],colorImageData.data[ p + 2 ]);
@@ -184,7 +144,7 @@ app.post('/api/mesh', upload.fields([{ name: 'image', maxCount: 1 }, { name: 'de
             vz = planeGeometryOld.attributes.position.array[ j + 2 ];
 
             // returb
-            p = Math.round( ( ( -vy + .5 ) ) * ( depthImage.height - 1 ) ) * depthImage.width * 4 + Math.round( ( ( vx + .5 ) ) * ( depthImage.width - 1 ) ) * 4;
+            p = Math.round( ( ( -vy + .5 ) ) * ( height - 1 ) ) * width * 4 + Math.round( ( ( vx + .5 ) ) * ( width - 1 ) ) * 4;
 
             var dn = imageData.data[ p ] / 255;
             var rd = ( 1 - dn ) * ( far - near ) + near; // RangeLinear
@@ -210,16 +170,10 @@ app.post('/api/mesh', upload.fields([{ name: 'image', maxCount: 1 }, { name: 'de
         // planeGeometry.computeFaceNormals();
         planeGeometryOld.computeVertexNormals();
 
-        // texture (dont really need this for object)
-        var tex = new THREE.Texture( colorImage );
-		tex.needsUpdate = true;
-
         // create mesh with texture and plane geometry
-        var mesh = new THREE.Mesh( planeGeometryOld, new THREE.MeshBasicMaterial( { map: tex, wireframe: false, side: THREE.DoubleSide }) );
+        var mesh = new THREE.Mesh( planeGeometryOld, new THREE.MeshBasicMaterial( { /*map: tex,*/ wireframe: false, side: THREE.DoubleSide }) );
         console.log("COMPARING MESH TO DP")
         console.log(mesh)
-        const loader = new OBJLoader();
-        //loader.load('dp.obj', function(object) {console.log("PRINTING DP"); console.log(object);});
         mesh.scale.set( adjustment, adjustment, adjustment );
 
 
