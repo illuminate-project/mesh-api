@@ -25,8 +25,8 @@ app.use(express.urlencoded({ extended: false }));
 
 app.post('/api/mesh', upload.fields([{ name: 'image', maxCount: 1 }, { name: 'depth', maxCount: 1 }]), async (req, res) => {
     try {
-        const colorImage = await Jimp.read(req.files['image'][0].buffer);
-        const depthImage = await Jimp.read(req.files['depth'][0].buffer);
+        const colorImage = images(req.files.image[0].buffer);;
+        const depthImage = images(req.files.depth[0].buffer);;
         //const { width, height } = image.bitmap;
 
         var far = 20;
@@ -37,7 +37,7 @@ app.post('/api/mesh', upload.fields([{ name: 'image', maxCount: 1 }, { name: 'de
         var colorImage = images("image_50.jpg");*/
 
         // creates uint8array of image data which is later used to make imageData object
-        var depthBuf = req.files.image[0].buffer;
+        var depthBuf = req.files.depth[0].buffer;
         var decodedData1;
         console.log("reached here")
         inkjet.decode(depthBuf, function(err, decoded){
@@ -45,7 +45,7 @@ app.post('/api/mesh', upload.fields([{ name: 'image', maxCount: 1 }, { name: 'de
             decodedData1 = new Uint8ClampedArray(decoded.data);
         });
         
-        var imageBuf = req.files.depth[0].buffer;
+        var imageBuf = req.files.image[0].buffer;
         var decodedData2;
         console.log("reached here 2")
         inkjet.decode(imageBuf, function(err, decoded2){
@@ -142,11 +142,7 @@ app.post('/api/mesh', upload.fields([{ name: 'image', maxCount: 1 }, { name: 'de
         }
 
         var offset = ( maxZ - minZ ) / 2;
-        // for( var j = 0; j < positions.length; j+=3 ) {
-        //     positions[ j + 2 ] += offset;
-        // }
-
-        //var step = settings.quadSize;
+     
         
         // CREATING PLANE GEOMETRY FOR MESH
 
@@ -154,9 +150,6 @@ app.post('/api/mesh', upload.fields([{ name: 'image', maxCount: 1 }, { name: 'de
         console.log("PLANE GEOMETRY OLD")
         console.log(planeGeometryOld)
         console.log(planeGeometryOld.attributes.position.array) // THIS IS VERTICES
-        // var planeGeometry2 = new THREE.BufferGeometry(1, 1, Math.round(w), Math.round(h))
-        // console.log("PLANE GEOMETRY 2")
-        // console.log(planeGeometry2)
 
         var planeGeometry = new THREE.BufferGeometry();
         //var vertices = new Float32Array(size * 3); // x, y, z per point, num points = size
