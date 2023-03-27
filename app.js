@@ -1,14 +1,10 @@
 import express from 'express';
 import multer from 'multer';
-import Jimp from 'jimp';
 import { createCanvas, ImageData } from 'canvas';
-import sharp from 'sharp';
 import * as THREE from 'three';
 import { OBJExporter } from 'three/addons/exporters/OBJExporter.js';
 import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
-import fs from 'fs';
-
-import images from 'images';
+import sharp from 'sharp';
 import inkjet from 'inkjet';
 
 const app = express();
@@ -22,11 +18,31 @@ const upload = multer({
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+ 
 
 app.post('/api/mesh', upload.fields([{ name: 'image', maxCount: 1 }, { name: 'depth', maxCount: 1 }]), async (req, res) => {
     try {
-        const colorImage = images(req.files.image[0].buffer);;
-        const depthImage = images(req.files.depth[0].buffer);;
+        
+        async function bufferToImage(buffer, inputFormat) {
+            try {
+            // read the buffer and convert it into an image
+            const image = await sharp(buffer, { inputFormat }).toBuffer();
+        
+            // get the image metadata, including width and height
+            const metadata = await sharp(image).metadata();
+        
+            return {
+                buffer: image,
+                width: metadata.width,
+                height: metadata.height,
+            };
+            } catch (error) {
+            console.error(error);
+            }
+        }
+        
+        const colorImage = await bufferToImage(req.files.image[0].buffer, 'jpg');
+        const depthImage = await bufferToImage(req.files.depth[0].buffer, 'jpg');
         //const { width, height } = image.bitmap;
 
         var far = 20;
@@ -55,25 +71,25 @@ app.post('/api/mesh', upload.fields([{ name: 'image', maxCount: 1 }, { name: 'de
 
         // change this manually to change scale
         var downsample = 6;
-        var w = Math.round( depthImage.width() / downsample );
-        var h = Math.round( depthImage.height() / downsample );
+        var w = Math.round( depthImage.width / downsample );
+        var h = Math.round( depthImage.height / downsample );
 
         // depth canvas
-        var canvas = createCanvas( depthImage.width(), depthImage.height() );
+        var canvas = createCanvas( depthImage.width, depthImage.height );
         var ctx = canvas.getContext( '2d' );
         //ctx.drawImage(depthImage, 0, 0);
         //var imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        var imageData = new ImageData(decodedData1, depthImage.width(), depthImage.height());
+        var imageData = new ImageData(decodedData1, depthImage.width, depthImage.height);
         console.log("please work");
         console.log(imageData.data);
         var p = 0;
 
         // color canvas
-        var colorCanvas = createCanvas( colorImage.width(), colorImage.height() );
+        var colorCanvas = createCanvas( colorImage.width, colorImage.height );
         var colorCtx = colorCanvas.getContext( '2d' );
         //colorCtx.drawImage(colorImage, 0, 0);
         //var colorImageData = colorCtx.getImageData(0, 0, colorCanvas.width, colorCanvas.height);
-        var colorImageData = new ImageData(decodedData2, colorImage.width(), colorImage.height());
+        var colorImageData = new ImageData(decodedData2, colorImage.width, colorImage.height);
         var colorP = 0;
 
         // plane geometry (missing image data)
@@ -101,8 +117,8 @@ app.post('/api/mesh', upload.fields([{ name: 'image', maxCount: 1 }, { name: 'de
         var positions = geometry.attributes.position.array;
         var customColors = geometry.attributes.customColor.array;
 
-        var adjustment = 10 * 960 / depthImage.width() 
-        var ar = depthImage.height() / depthImage.width();
+        var adjustment = 10 * 960 / depthImage.width; 
+        var ar = depthImage.height / depthImage.width;
         var scale = new THREE.Vector3( 1, 1, 1 );
         var v = new THREE.Vector3();
         var ptr = 0;
@@ -113,7 +129,7 @@ app.post('/api/mesh', upload.fields([{ name: 'image', maxCount: 1 }, { name: 'de
             for( var x = 0; x < w; x++ ) {
                 v.x = ( x - .5 * w ) / w;
                 v.y = ( y - .5 * h ) / h;
-                p = Math.round( ( ( -v.y + .5 ) ) * ( depthImage.height() - 1 ) ) * depthImage.width() * 4 + Math.round( ( ( v.x + .5 ) ) * ( depthImage.width() - 1 ) ) * 4;
+                p = Math.round( ( ( -v.y + .5 ) ) * ( depthImage.height - 1 ) ) * depthImage.width * 4 + Math.round( ( ( v.x + .5 ) ) * ( depthImage.width - 1 ) ) * 4;
                 //console.log("y = ",y,"x = ",x,
                 //                        "imageData = ",imageData.data[ p ],
                 //                        "colorImageData = ",colorImageData.data[ p + 0 ],colorImageData.data[ p + 1 ],colorImageData.data[ p + 2 ]);
@@ -168,7 +184,7 @@ app.post('/api/mesh', upload.fields([{ name: 'image', maxCount: 1 }, { name: 'de
             vz = planeGeometryOld.attributes.position.array[ j + 2 ];
 
             // returb
-            p = Math.round( ( ( -vy + .5 ) ) * ( depthImage.height() - 1 ) ) * depthImage.width() * 4 + Math.round( ( ( vx + .5 ) ) * ( depthImage.width() - 1 ) ) * 4;
+            p = Math.round( ( ( -vy + .5 ) ) * ( depthImage.height - 1 ) ) * depthImage.width * 4 + Math.round( ( ( vx + .5 ) ) * ( depthImage.width - 1 ) ) * 4;
 
             var dn = imageData.data[ p ] / 255;
             var rd = ( 1 - dn ) * ( far - near ) + near; // RangeLinear
