@@ -178,9 +178,9 @@ app.post('/api/mesh', upload.fields([{ name: 'image', maxCount: 1 }, { name: 'de
             vy *= rd * ar;
             vz += offset;
 
-            planeGeometryOld.attributes.position.array[ j ] = vx;
-            planeGeometryOld.attributes.position.array[ j + 1 ] = vy;
-            planeGeometryOld.attributes.position.array[ j + 2 ] = vz;
+            planeGeometryOld.attributes.position.array[ j ] = vx; // changes horizontal squish
+            planeGeometryOld.attributes.position.array[ j + 1 ] = vy; // changes vertical squish
+            planeGeometryOld.attributes.position.array[ j + 2 ] = vz * 0.50; // changes depth
             vertices[j] = vx;
             vertices[j+1] = vy;
             vertices[j+2] = vz;
